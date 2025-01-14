@@ -1,2 +1,1 @@
-# Algo
-Alpaca Trading Algorithm 
+This code runs a trading algorithm that fetches the Date, Open, High, Low, Close (Prices), and Volume of selected Tickers, in this case its fetching data for AAPL, MSFT, and GOOG every 60 seconds and updating an Excel spreadsheet with the purpose to automatically produce Buy and Sell Signals with algorthimically produced Bollingers, RSI, EMA calculations.  Combining this algorithm and Alpaca's Trading API along with a trading criteria, an action will then be sent to Alpaca's paper trading simulation to either buy or sell stock.
