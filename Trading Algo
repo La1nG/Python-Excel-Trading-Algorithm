@@ -1,0 +1,167 @@
+mport yfinance as yf
+import pandas as pd
+import openpyxl
+from openpyxl import Workbook
+from datetime import datetime
+import time
+import numpy as np
+import alpaca_trade_api as tradeapi
+
+# Insert Alpaca API Credentials From Alpaca Trading API here
+ALPACA_API_KEY = "ALPACA_API_KEY"
+ALPACA_SECRET_KEY = "ALPACA_SECRET_KEY"
+ALPACA_ENDPOINT = "ALPACA_ENDPOINT"
+
+# Initialize Alpaca API
+alpaca_api = tradeapi.REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_ENDPOINT, api_version='v2')
+
+# list the stock symbols you want to track here
+STOCK_SYMBOLS = ['AAPL', 'GOOG', 'MSFT']
+
+# under 'YOUR_EXCEL_FILE_NAME.xlsx', if it exists in your path as a .xlsx it'll update automatically and if it doesnt it will be automatically created there. Make sure it isn't open as the script is running.
+EXCEL_FILE = 'YOUR_EXCEL_FILE_NAME.xlsx'
+SHEET_NAME = 'MarketData'
+
+# Trading Logic - It should take up to 14-20 days to get the most accurate buy and sell signals to Alpaca and results for each of the indicators due to how rolling(window=x) is set but it can be changed to your Discretion  
+def advanced_trading_logic(df):
+    # RSI Calculation (Relative Strength Index)
+    delta = df['Close'].diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    avg_gain = gain.rolling(window=14).mean()
+    avg_loss = loss.rolling(window=14).mean()
+    rs = avg_gain / avg_loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+
+    # EMA20 Calculation (Exponential Moving Average)
+    df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
+
+    # Bollinger Bands Calculation (BB_Mid, BB_Upper, BB_Lower)
+    df['BB_Mid'] = df['Close'].rolling(window=20).mean()
+    df['BB_Upper'] = df['BB_Mid'] + 2 * df['Close'].rolling(window=20).std()
+    df['BB_Lower'] = df['BB_Mid'] - 2 * df['Close'].rolling(window=20).std()
+
+    df['Signal'] = None
+    df['Action'] = None
+
+    # Signal and Action logic based on RSI and Bollinger Bands
+    for i in range(len(df)):
+        if i < 20:  # Skip first 20 rows due to rolling window
+            continue
+
+        if df['RSI'].iloc[i] < 30 and df['Close'].iloc[i] < df['BB_Lower'].iloc[i]:
+            df.at[i, 'Signal'] = True
+            df.at[i, 'Action'] = 'Buy'
+
+        elif df['RSI'].iloc[i] > 70 or df['Close'].iloc[i] > df['BB_Upper'].iloc[i]:
+            df.at[i, 'Signal'] = False
+            df.at[i, 'Action'] = 'Sell'
+
+    return df
+
+# Fetch market data
+def fetch_market_data(symbols, interval='1d', period='1d'):
+    data = {}
+    for symbol in symbols:
+        print(f"Fetching data for {symbol}...")
+        stock = yf.Ticker(symbol)
+        df = stock.history(period=period, interval=interval)
+        data[symbol] = df
+    return data
+
+# Execute trade using Alpaca
+def execute_trade(symbol, action):
+    try:
+        if action == 'Buy':
+            print(f"Placing a buy order for {symbol}...")
+            response = alpaca_api.submit_order(
+                symbol=symbol,
+                qty=1,
+                side='buy',
+                type='market',
+                time_in_force='gtc'
+            )
+            print("Buy order response:", response)
+        elif action == 'Sell':
+            print(f"Placing a sell order for {symbol}...")
+            response = alpaca_api.submit_order(
+                symbol=symbol,
+                qty=1,
+                side='sell',
+                type='market',
+                time_in_force='gtc'
+            )
+            print("Sell order response:", response)
+        else:
+            print(f"No valid action for {symbol}.")
+        
+        # Check current orders status
+        orders = alpaca_api.list_orders(status='all')
+        print(f"Current orders for {symbol}: {orders}")
+    
+    except Exception as e:
+        print(f"Error executing trade for {symbol}: {e}")
+
+# Create or update Excel file
+def update_excel(data):
+    try:
+        wb = openpyxl.load_workbook(EXCEL_FILE)
+        if SHEET_NAME in wb.sheetnames:
+            sheet = wb[SHEET_NAME]
+        else:
+            sheet = wb.create_sheet(SHEET_NAME)
+            sheet.append([  # Column headers
+                'Symbol', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume',
+                'RSI', 'EMA20', 'BB_Mid', 'BB_Upper', 'BB_Lower', 'Signal', 'Action'
+            ])
+    except FileNotFoundError:
+        print(f"Creating a new workbook {EXCEL_FILE}...")
+        wb = Workbook()
+        sheet = wb.active
+        sheet.title = SHEET_NAME
+        sheet.append([  # Column headers
+            'Symbol', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume',
+            'RSI', 'EMA20', 'BB_Mid', 'BB_Upper', 'BB_Lower', 'Signal', 'Action'
+        ])
+
+    for symbol, df in data.items():
+        for index, row in df.iterrows():
+            date = index.strftime('%Y-%m-%d %H:%M:%S')
+            open_price = row['Open']
+            high = row['High']
+            low = row['Low']
+            close = row['Close']
+            volume = row['Volume']
+            rsi = row.get('RSI', np.nan)
+            ema20 = row.get('EMA20', np.nan)
+            bb_mid = row.get('BB_Mid', np.nan)
+            bb_upper = row.get('BB_Upper', np.nan)
+            bb_lower = row.get('BB_Lower', np.nan)
+            signal = row.get('Signal', np.nan)
+            action = row.get('Action', np.nan)
+
+            sheet.append([  # Append row
+                symbol, date, open_price, high, low, close, volume, rsi, ema20,
+                bb_mid, bb_upper, bb_lower, signal, action
+            ])
+
+    wb.save(EXCEL_FILE)
+    print(f"Excel file {EXCEL_FILE} updated successfully.")
+
+# Main function
+def main():
+    print(f"Starting the advanced trading tool at {datetime.now()}...")
+    market_data = fetch_market_data(STOCK_SYMBOLS, interval='1d', period='1d')
+    for symbol, df in market_data.items():
+        market_data[symbol] = advanced_trading_logic(df)
+        last_action = df.iloc[-1]['Action']
+        if pd.notna(last_action):
+            execute_trade(symbol, last_action)
+    update_excel(market_data)
+
+# Periodic execution - you can change time.sleep to your preference of however often you want the sheet to update, below its set to update every minute during trading hours.
+if __name__ == "__main__":
+    while True:
+        main()
+        print("Sleeping for 1 minute...")
+        time.sleep(60)
