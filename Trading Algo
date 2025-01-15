@@ -59,8 +59,8 @@ def advanced_trading_logic(df):
 
     return df
 
-# Fetch market data
-def fetch_market_data(symbols, interval='1d', period='1d'):
+# Fetch market data - 1 month period will fetch the last 30 days of historical data over the interval chosen
+def fetch_market_data(symbols, interval='15m', period='1mo'):
     data = {}
     for symbol in symbols:
         print(f"Fetching data for {symbol}...")
@@ -151,7 +151,7 @@ def update_excel(data):
 # Main function
 def main():
     print(f"Starting the advanced trading tool at {datetime.now()}...")
-    market_data = fetch_market_data(STOCK_SYMBOLS, interval='1d', period='1d')
+    market_data = fetch_market_data(STOCK_SYMBOLS, interval='15m', period='1mo')
     for symbol, df in market_data.items():
         market_data[symbol] = advanced_trading_logic(df)
         last_action = df.iloc[-1]['Action']
@@ -163,5 +163,5 @@ def main():
 if __name__ == "__main__":
     while True:
         main()
-        print("Sleeping for 1 minute...")
-        time.sleep(60)
+        print("Sleeping for 15 minutes...")
+        time.sleep(900)
