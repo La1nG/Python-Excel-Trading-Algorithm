@@ -22,7 +22,7 @@ STOCK_SYMBOLS = ['AAPL', 'GOOG', 'MSFT']
 EXCEL_FILE = 'YOUR_EXCEL_FILE_NAME.xlsx'
 SHEET_NAME = 'MarketData'
 
-# Trading Logic - It should take up to 14-20 days to get the most accurate buy and sell signals to Alpaca and results for each of the indicators due to how rolling(window=x) is set but it can be changed to your Discretion  
+# Trading Logic 
 def advanced_trading_logic(df):
     # RSI Calculation (Relative Strength Index)
     delta = df['Close'].diff()
