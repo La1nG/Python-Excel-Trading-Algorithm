@@ -23,7 +23,7 @@ EXCEL_FILE = 'YOUR_EXCEL_FILE_NAME.xlsx'
 SHEET_NAME = 'MarketData'
 
 # Trading Logic 
-def advanced_trading_logic(df):
+def trading_logic(df):
     # RSI Calculation (Relative Strength Index)
     delta = df['Close'].diff()
     gain = delta.where(delta > 0, 0)
@@ -150,10 +150,10 @@ def update_excel(data):
 
 # Main function
 def main():
-    print(f"Starting the advanced trading tool at {datetime.now()}...")
+    print(f"Starting the trading tool at {datetime.now()}...")
     market_data = fetch_market_data(STOCK_SYMBOLS, interval='15m', period='1mo')
     for symbol, df in market_data.items():
-        market_data[symbol] = advanced_trading_logic(df)
+        market_data[symbol] = trading_logic(df)
         last_action = df.iloc[-1]['Action']
         if pd.notna(last_action):
             execute_trade(symbol, last_action)
