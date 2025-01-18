@@ -2,4 +2,4 @@ This code runs a a mean reversion strategy using several financial indicators; E
 
 Notes: An account with a Trading API such as Alpaca must be made then inserted where prompted.
 
-Currently Working on: aware-timezone information and formatting buy/sell order information neatly next to ticker info
+Currently Working on: Bracket Orders, aware-timezone information and formatting buy/sell order information neatly next to ticker info
