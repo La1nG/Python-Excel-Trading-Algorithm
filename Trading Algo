@@ -7,7 +7,7 @@ import time
 import numpy as np
 import alpaca_trade_api as tradeapi
 
-# Insert Alpaca API Credentials From Alpaca Trading API here
+# Alpaca API Credentials
 ALPACA_API_KEY = "ALPACA_API_KEY"
 ALPACA_SECRET_KEY = "ALPACA_SECRET_KEY"
 ALPACA_ENDPOINT = "ALPACA_ENDPOINT"
@@ -15,14 +15,14 @@ ALPACA_ENDPOINT = "ALPACA_ENDPOINT"
 # Initialize Alpaca API
 alpaca_api = tradeapi.REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_ENDPOINT, api_version='v2')
 
-# list the stock symbols you want to track here
+# Define stock symbols
 STOCK_SYMBOLS = ['AAPL', 'GOOG', 'MSFT']
 
-# under 'YOUR_EXCEL_FILE_NAME.xlsx', if it exists in your path as a .xlsx it'll update automatically and if it doesnt it will be automatically created there. Make sure it isn't open as the script is running.
-EXCEL_FILE = 'YOUR_EXCEL_FILE_NAME.xlsx'
-SHEET_NAME = 'MarketData'
+# Name your Excel file and Excel sheet
+EXCEL_FILE = 'Excel_File_Name.xlsx'
+SHEET_NAME = 'Sheet_Name_Here'
 
-# Trading Logic 
+# Trading Logic
 def trading_logic(df):
     # RSI Calculation (Relative Strength Index)
     delta = df['Close'].diff()
@@ -33,7 +33,7 @@ def trading_logic(df):
     rs = avg_gain / avg_loss
     df['RSI'] = 100 - (100 / (1 + rs))
 
-    # EMA20 Calculation (Exponential Moving Average)
+    # EMA20 Calculation (Exponential Moving Average 20 period)
     df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
 
     # Bollinger Bands Calculation (BB_Mid, BB_Upper, BB_Lower)
@@ -44,9 +44,9 @@ def trading_logic(df):
     df['Signal'] = None
     df['Action'] = None
 
-    # Signal and Action logic based on RSI and Bollinger Bands
+    # Signal and Action - based on the RSI and Bollinger Bands
     for i in range(len(df)):
-        if i < 20:  # Skip first 20 rows due to rolling window
+        if i < 20:  # This skips the first 20 rows because of rolling(window=x)
             continue
 
         if df['RSI'].iloc[i] < 30 and df['Close'].iloc[i] < df['BB_Lower'].iloc[i]:
@@ -59,50 +59,69 @@ def trading_logic(df):
 
     return df
 
-# Fetch market data - 1 month period will fetch the last 30 days of historical data over the interval chosen
+# Fetch market data - This takes historical data over the last month at 15m intervals to start calculations.
 def fetch_market_data(symbols, interval='15m', period='1mo'):
     data = {}
     for symbol in symbols:
         print(f"Fetching data for {symbol}...")
         stock = yf.Ticker(symbol)
         df = stock.history(period=period, interval=interval)
+        df.index = pd.to_datetime(df.index)  
+        df.index = df.index.tz_localize(None)  # Makes the index timezone-naive 
         data[symbol] = df
     return data
 
-# Execute trade using Alpaca
 def execute_trade(symbol, action):
     try:
+        # Fetches the current price
+        latest_trade = alpaca_api.get_latest_trade(symbol)
+        current_price = latest_trade.price
+
+        # bracket order rules
+        quantity = 1
+        take_profit_price = round(current_price * 1.05, 2)  # 5% above current price
+        stop_loss_price = round(current_price * 0.95, 2)    # 5% below current price
+
+        # Submits the bracket order
         if action == 'Buy':
-            print(f"Placing a buy order for {symbol}...")
-            response = alpaca_api.submit_order(
+            print(f"Placing a bracket order (BUY) for {symbol}...")
+            alpaca_api.submit_order(
                 symbol=symbol,
-                qty=1,
+                qty=quantity,
                 side='buy',
                 type='market',
-                time_in_force='gtc'
+                time_in_force='gtc',
+                order_class='bracket',
+                take_profit={'limit_price': take_profit_price},
+                stop_loss={'stop_price': stop_loss_price}
             )
-            print("Buy order response:", response)
         elif action == 'Sell':
-            print(f"Placing a sell order for {symbol}...")
-            response = alpaca_api.submit_order(
+            print(f"Placing a bracket order (SELL) for {symbol}...")
+            alpaca_api.submit_order(
                 symbol=symbol,
-                qty=1,
+                qty=quantity,
                 side='sell',
                 type='market',
-                time_in_force='gtc'
+                time_in_force='gtc',
+                order_class='bracket',
+                take_profit={'limit_price': take_profit_price},
+                stop_loss={'stop_price': stop_loss_price}
             )
-            print("Sell order response:", response)
         else:
             print(f"No valid action for {symbol}.")
+            return current_price, None, None
+
+        # Log order details
+        print(f"Ticker: {symbol} | Action: {action} | Entry Price: ${current_price:.2f} | "
+              f"Take Profit: ${take_profit_price} | Stop Loss: ${stop_loss_price}")
         
-        # Check current orders status
-        orders = alpaca_api.list_orders(status='all')
-        print(f"Current orders for {symbol}: {orders}")
-    
+        return current_price, take_profit_price, stop_loss_price
+
     except Exception as e:
         print(f"Error executing trade for {symbol}: {e}")
+        return None, None, None
 
-# Create or update Excel file
+ # Load workbook or create a new one if it doesn't exist
 def update_excel(data):
     try:
         wb = openpyxl.load_workbook(EXCEL_FILE)
@@ -112,7 +131,8 @@ def update_excel(data):
             sheet = wb.create_sheet(SHEET_NAME)
             sheet.append([  # Column headers
                 'Symbol', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume',
-                'RSI', 'EMA20', 'BB_Mid', 'BB_Upper', 'BB_Lower', 'Signal', 'Action'
+                'RSI', 'EMA20', 'BB_Mid', 'BB_Upper', 'BB_Lower', 'Signal',
+                'Action', 'Entry Price', 'Take Profit', 'Stop Loss'
             ])
     except FileNotFoundError:
         print(f"Creating a new workbook {EXCEL_FILE}...")
@@ -121,12 +141,19 @@ def update_excel(data):
         sheet.title = SHEET_NAME
         sheet.append([  # Column headers
             'Symbol', 'Date', 'Open', 'High', 'Low', 'Close', 'Volume',
-            'RSI', 'EMA20', 'BB_Mid', 'BB_Upper', 'BB_Lower', 'Signal', 'Action'
+            'RSI', 'EMA20', 'BB_Mid', 'BB_Upper', 'BB_Lower', 'Signal',
+            'Action', 'Entry Price', 'Take Profit', 'Stop Loss'
         ])
 
+    # Add data for each symbol
     for symbol, df in data.items():
         for index, row in df.iterrows():
-            date = index.strftime('%Y-%m-%d %H:%M:%S')
+            if isinstance(index, pd.Timestamp):
+                date = index.strftime('%Y-%m-%d %H:%M:%S')
+            else:
+                date = str(index)
+
+            # Core data
             open_price = row['Open']
             high = row['High']
             low = row['Low']
@@ -140,28 +167,35 @@ def update_excel(data):
             signal = row.get('Signal', np.nan)
             action = row.get('Action', np.nan)
 
-            sheet.append([  # Append row
+            # Bracket order details
+            entry_price, take_profit_price, stop_loss_price = None, None, None
+            if pd.notna(action):
+                entry_price, take_profit_price, stop_loss_price = execute_trade(symbol, action)
+
+            # Append information to Excel
+            sheet.append([
                 symbol, date, open_price, high, low, close, volume, rsi, ema20,
-                bb_mid, bb_upper, bb_lower, signal, action
+                bb_mid, bb_upper, bb_lower, signal, action, entry_price,
+                take_profit_price, stop_loss_price
             ])
 
+    # Save workbook
     wb.save(EXCEL_FILE)
     print(f"Excel file {EXCEL_FILE} updated successfully.")
 
+
 # Main function
 def main():
-    print(f"Starting the trading tool at {datetime.now()}...")
+    print(f"Started at {datetime.now()}...")
     market_data = fetch_market_data(STOCK_SYMBOLS, interval='15m', period='1mo')
     for symbol, df in market_data.items():
-        market_data[symbol] = trading_logic(df)
-        last_action = df.iloc[-1]['Action']
-        if pd.notna(last_action):
-            execute_trade(symbol, last_action)
+        market_data[symbol] = advanced_trading_logic(df)
     update_excel(market_data)
 
-# Periodic execution - you can change time.sleep to your preference of however often you want the sheet to update, below its set to update every minute during trading hours.
+
+# Periodic execution function
 if __name__ == "__main__":
     while True:
         main()
-        print("Sleeping for 15 minutes...")
+        print("Sleeping for 15 minute...")
         time.sleep(900)
