@@ -12,7 +12,7 @@ ALPACA_API_KEY = "ALPACA_API_KEY"
 ALPACA_SECRET_KEY = "ALPACA_SECRET_KEY"
 ALPACA_ENDPOINT = "ALPACA_ENDPOINT"
 
-''' This connects the Algorithm to your Trading API '''
+'''This connects the Algorithm to your Trading API'''
 
 alpaca_api = tradeapi.REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_ENDPOINT, api_version='v2')
 
