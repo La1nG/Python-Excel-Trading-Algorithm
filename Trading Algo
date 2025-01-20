@@ -12,19 +12,23 @@ ALPACA_API_KEY = "ALPACA_API_KEY"
 ALPACA_SECRET_KEY = "ALPACA_SECRET_KEY"
 ALPACA_ENDPOINT = "ALPACA_ENDPOINT"
 
-# Initialize Alpaca API
+''' This connects the Algorithm to your Trading API '''
+
 alpaca_api = tradeapi.REST(ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_ENDPOINT, api_version='v2')
 
 # Define stock symbols
 STOCK_SYMBOLS = ['AAPL', 'GOOG', 'MSFT']
+''' Defines the Stock Tickers that will be Traded '''
 
-# Name your Excel file and Excel sheet
-EXCEL_FILE = 'Excel_File_Name.xlsx'
-SHEET_NAME = 'Sheet_Name_Here'
+# Excel file and sheet
+EXCEL_FILE = 'AlgorithTradingFileBrackets.xlsx'
+SHEET_NAME = 'MarketData'
+'''This function connects to either the named Excel File and Excel Sheet or creates an excel file of the name written '''
 
 # Trading Logic
 def trading_logic(df):
-    # RSI Calculation (Relative Strength Index)
+    ''' These functions create the rules for Buy/Sell Actions following a mean reversion strategy '''
+    # 14 Day RSI Calculation (Relative Strength Index)
     delta = df['Close'].diff()
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
@@ -33,10 +37,10 @@ def trading_logic(df):
     rs = avg_gain / avg_loss
     df['RSI'] = 100 - (100 / (1 + rs))
 
-    # EMA20 Calculation (Exponential Moving Average 20 period)
+    # EMA20 Calculation (Exponential Moving Average)
     df['EMA20'] = df['Close'].ewm(span=20, adjust=False).mean()
 
-    # Bollinger Bands Calculation (BB_Mid, BB_Upper, BB_Lower)
+    # 20 Day Bollinger Bands Calculation (BB_Mid, BB_Upper, BB_Lower)
     df['BB_Mid'] = df['Close'].rolling(window=20).mean()
     df['BB_Upper'] = df['BB_Mid'] + 2 * df['Close'].rolling(window=20).std()
     df['BB_Lower'] = df['BB_Mid'] - 2 * df['Close'].rolling(window=20).std()
@@ -44,9 +48,9 @@ def trading_logic(df):
     df['Signal'] = None
     df['Action'] = None
 
-    # Signal and Action - based on the RSI and Bollinger Bands
+    # Signal and Action logic based on RSI and Bollinger Bands
     for i in range(len(df)):
-        if i < 20:  # This skips the first 20 rows because of rolling(window=x)
+        if i < 20:  # Skip first 20 rows due to rolling window
             continue
 
         if df['RSI'].iloc[i] < 30 and df['Close'].iloc[i] < df['BB_Lower'].iloc[i]:
@@ -56,74 +60,81 @@ def trading_logic(df):
         elif df['RSI'].iloc[i] > 70 or df['Close'].iloc[i] > df['BB_Upper'].iloc[i]:
             df.at[i, 'Signal'] = False
             df.at[i, 'Action'] = 'Sell'
-
+''' If RSI is less than 30 and the close price is less than Bollinger Bands (Lower), a Buy Signal is initiated.
+Otherwise, if RSI is greater than 70 or, close price is greater than the Bollinger Bands (Upper), a Sell Signal is initiated.
+'''
     return df
 
-# Fetch market data - This takes historical data over the last month at 15m intervals to start calculations.
+# Fetch market data
 def fetch_market_data(symbols, interval='15m', period='1mo'):
     data = {}
     for symbol in symbols:
         print(f"Fetching data for {symbol}...")
         stock = yf.Ticker(symbol)
         df = stock.history(period=period, interval=interval)
-        df.index = pd.to_datetime(df.index)  
-        df.index = df.index.tz_localize(None)  # Makes the index timezone-naive 
+        df.index = pd.to_datetime(df.index)  # Ensure the index is datetime
+        df.index = df.index.tz_localize(None)  # Make the datetime index timezone-naive
         data[symbol] = df
     return data
+''' Fetches Market Data using yfinance API over the last month at 15 minutues intervals to begin calculations (adjustable)'''
+
 
 def execute_trade(symbol, action):
     try:
-        # Fetches the current price
+        # Fetch the current price
         latest_trade = alpaca_api.get_latest_trade(symbol)
         current_price = latest_trade.price
 
-        # bracket order rules
+        # Define bracket order parameters
         quantity = 1
-        take_profit_price = round(current_price * 1.05, 2)  # 5% above current price
-        stop_loss_price = round(current_price * 0.95, 2)    # 5% below current price
+''' Defines the order quantity '''
 
-        # Submits the bracket order
+        # Adjust take profit and stop loss based on action
         if action == 'Buy':
-            print(f"Placing a bracket order (BUY) for {symbol}...")
-            alpaca_api.submit_order(
-                symbol=symbol,
-                qty=quantity,
-                side='buy',
-                type='market',
-                time_in_force='gtc',
-                order_class='bracket',
-                take_profit={'limit_price': take_profit_price},
-                stop_loss={'stop_price': stop_loss_price}
-            )
+            take_profit_price = round(current_price * 1.05, 2)  # 5% above current price
+            stop_loss_price = round(current_price * 0.95, 2)    # 5% below current price
         elif action == 'Sell':
-            print(f"Placing a bracket order (SELL) for {symbol}...")
-            alpaca_api.submit_order(
-                symbol=symbol,
-                qty=quantity,
-                side='sell',
-                type='market',
-                time_in_force='gtc',
-                order_class='bracket',
-                take_profit={'limit_price': take_profit_price},
-                stop_loss={'stop_price': stop_loss_price}
-            )
+            take_profit_price = round(current_price * 0.95, 2)  
+            stop_loss_price = round(current_price * 1.05, 2)    
         else:
             print(f"No valid action for {symbol}.")
             return current_price, None, None
+''' States Stop Loss and Profit parameters '''
 
-        # Log order details
-        print(f"Ticker: {symbol} | Action: {action} | Entry Price: ${current_price:.2f} | "
-              f"Take Profit: ${take_profit_price} | Stop Loss: ${stop_loss_price}")
+        # Validate parameters for Buy and Sell orders
+        if action == 'Sell' and take_profit_price >= stop_loss_price:
+            print(f"Error: take_profit.limit_price ({take_profit_price}) must be less than stop_loss.stop_price ({stop_loss_price}) for a Sell order.")
+            return current_price, take_profit_price, stop_loss_price
         
+                elif action == 'Buy' and take_profit_price <= stop_loss_price:
+            print(f"Error: take_profit.limit_price ({take_profit_price}) must be greater than stop_loss.stop_price ({stop_loss_price}) for a Buy order.")
+            return current_price, take_profit_price, stop_loss_price
+        ''' Checks for problems in executing bracket orders '''
+
+        # Submit a bracket order
+        print(f"Placing a bracket order ({action()}) for {symbol}...")
+        alpaca_api.submit_order(
+            symbol=symbol,
+            qty=quantity,
+            side=action.lower(),
+            type='market',
+            time_in_force='gtc',
+            order_class='bracket',
+            take_profit={'limit_price': take_profit_price},
+            stop_loss={'stop_price': stop_loss_price}
+        )
+
         return current_price, take_profit_price, stop_loss_price
 
     except Exception as e:
-        print(f"Error executing trade for {symbol}: {e}")
+        print(f"Problem executing a trade for {symbol}: {e}")
         return None, None, None
 
- # Load workbook or create a new one if it doesn't exist
+
+# Create or update Excel file
 def update_excel(data):
     try:
+        # Load workbook or create a new one if it doesn't exist with Openpyxl
         wb = openpyxl.load_workbook(EXCEL_FILE)
         if SHEET_NAME in wb.sheetnames:
             sheet = wb[SHEET_NAME]
@@ -145,15 +156,15 @@ def update_excel(data):
             'Action', 'Entry Price', 'Take Profit', 'Stop Loss'
         ])
 
-    # Add data for each symbol
+    # Add data to the spreadsheet
     for symbol, df in data.items():
         for index, row in df.iterrows():
             if isinstance(index, pd.Timestamp):
                 date = index.strftime('%Y-%m-%d %H:%M:%S')
             else:
                 date = str(index)
+''' Date and Time listing '''
 
-            # Core data
             open_price = row['Open']
             high = row['High']
             low = row['Low']
@@ -166,13 +177,14 @@ def update_excel(data):
             bb_lower = row.get('BB_Lower', np.nan)
             signal = row.get('Signal', np.nan)
             action = row.get('Action', np.nan)
+''' Market Data and Trading Logic '''
 
-            # Bracket order details
+            # order details
             entry_price, take_profit_price, stop_loss_price = None, None, None
             if pd.notna(action):
                 entry_price, take_profit_price, stop_loss_price = execute_trade(symbol, action)
 
-            # Append information to Excel
+            # Append data to Excel
             sheet.append([
                 symbol, date, open_price, high, low, close, volume, rsi, ema20,
                 bb_mid, bb_upper, bb_lower, signal, action, entry_price,
@@ -186,16 +198,16 @@ def update_excel(data):
 
 # Main function
 def main():
-    print(f"Started at {datetime.now()}...")
+    print(f"Starting the trading tool at {datetime.now()}...")
     market_data = fetch_market_data(STOCK_SYMBOLS, interval='15m', period='1mo')
     for symbol, df in market_data.items():
-        market_data[symbol] = advanced_trading_logic(df)
+        market_data[symbol] = trading_logic(df)
     update_excel(market_data)
 
-
-# Periodic execution function
 if __name__ == "__main__":
     while True:
         main()
         print("Sleeping for 15 minute...")
         time.sleep(900)
+
+''' Executes the script every 15 minutes '''
