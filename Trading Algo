@@ -21,7 +21,7 @@ STOCK_SYMBOLS = ['AAPL', 'GOOG', 'MSFT']
 """Defines the Stock Tickers that will be Traded."""
 
 # Excel file and sheet
-EXCEL_FILE = 'AlgorithTradingFileBrackets.xlsx'
+EXCEL_FILE = 'EXCEL_FILE_NAME.xlsx'
 SHEET_NAME = 'MarketData'
 """This function connects to either the named Excel File and Excel Sheet or creates an excel file of the name written."""
 
