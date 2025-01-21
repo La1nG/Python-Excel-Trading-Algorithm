@@ -29,7 +29,8 @@ pip install openpyxl
 ### Alpaca
 
 Alpaca is a Trading API that connects your algorithm to a Live or Paper trading service. Available [here](https://alpaca.markets/).
-Installable through `pip`:
+
+You can install it through `pip`:
 
 ```bash
 pip install alpaca_trade_api
