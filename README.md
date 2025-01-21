@@ -39,3 +39,8 @@ pip install alpaca_trade_api
 ## Set Up and Running the Script
 
 After these are installed the script is easy to run, just keep it running in the background while: Market is active, Excel file is `closed` while the script is fetching data, otherwise an error will occur, although its okay to view the excel data while its asleep (to clarify, during market hours as well).
+
+## Currently Working On:
+- Timezone-Aware
+- load credentials from an environmental variable (config.py)
+- finalise formatting
