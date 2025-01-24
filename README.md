@@ -44,5 +44,4 @@ After these are installed the script is easy to run, just keep it running in the
 - Timezone-Aware (NZST but changeable)
 - load credentials from an environmental variable (config.py)
 - Implement a method to control rate/flow of trades
-- finalise formatting
-  
+
