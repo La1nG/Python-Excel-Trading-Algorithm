@@ -40,8 +40,16 @@ pip install alpaca_trade_api
 
 After these are installed the script is easy to run, just keep it running in the background while: Market is active, Excel file is `closed` while the script is fetching data, otherwise an error will occur, although its okay to view the excel data while its asleep (to clarify, during market hours as well).
 
+### API Credentials
+
+There are two ways to run API credentials in this script:
+
+Creating a seperate file (Config.py) to store the keys then importing them into the algorithm can be considered as the more secure option if needed (the method used in this repository).
+
+The second option is to replace the line
+
+
 ## Currently Working On:
 - Timezone-Aware (NZST but changeable)
-- load credentials from an environmental variable (config.py)
 - Implement a method to control rate/flow of trades
 
