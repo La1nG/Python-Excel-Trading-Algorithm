@@ -8,9 +8,7 @@ import numpy as np
 import alpaca_trade_api as tradeapi
 
 # Alpaca API Credentials
-ALPACA_API_KEY = "ALPACA_API_KEY"
-ALPACA_SECRET_KEY = "ALPACA_SECRET_KEY"
-ALPACA_ENDPOINT = "ALPACA_ENDPOINT"
+from config import ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_ENDPOINT
 
 """This connects the Algorithm to your Trading API."""
 
