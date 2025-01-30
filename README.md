@@ -48,6 +48,14 @@ Creating a seperate file (Config.py) to store the keys then importing them into 
 
 The second option is to replace the line
 
+```
+from config import ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_ENDPOINT
+```
+
+with 
+
+
+
 
 ## Currently Working On:
 - Timezone-Aware (NZST but changeable)
