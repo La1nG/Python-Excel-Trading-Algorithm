@@ -46,14 +46,19 @@ There are two ways to run API credentials in this script:
 
 Creating a seperate file (Config.py) to store the keys then importing them into the algorithm can be considered as the more secure option if needed (the method used in this repository).
 
-The second option is to replace the line
+The second option is to replace the following line
 
 ```
 from config import ALPACA_API_KEY, ALPACA_SECRET_KEY, ALPACA_ENDPOINT
 ```
 
-with 
+with the config.py code directly.
 
+```
+ALPACA_API_KEY = "ALPACA_API_KEY"
+ALPACA_SECRET_KEY = "ALPACA_SECRET_KEY"
+ALPACA_ENDPOINT = "ALPACA_ENDPOINT"
+```
 
 
 
