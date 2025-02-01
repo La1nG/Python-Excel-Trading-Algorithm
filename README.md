@@ -62,7 +62,4 @@ ALPACA_ENDPOINT = "ALPACA_ENDPOINT"
 
 
 
-## Currently Working On:
-- Timezone-Aware (NZST but changeable)
-- Implement a method to control rate/flow of trades
 
